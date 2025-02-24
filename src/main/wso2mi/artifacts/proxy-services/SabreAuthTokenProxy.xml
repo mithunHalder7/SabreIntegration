@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<proxy xmlns="http://ws.apache.org/ns/synapse" name="SabreAuthTokenProxy" startOnLoad="true" trace="disable" transports="http https">
+    <target>
+        <inSequence>
+            <!-- Set Variables -->
+            <property name="base_url" value="https://api.cert.platform.sabre.com" scope="default"/>
+            <property name="username" value="596420" scope="default"/>
+            <property name="PseudoCityCode" value="AO0L" scope="default"/>
+            <property name="client_domain" value="AA" scope="default"/>
+            <property name="password" value="ak19tstc" scope="default"/>
+            
+            <!-- Construct JSON Username -->
+            <property name="JSON_Username" expression="fn:concat('V1:', get-property('username'), ':', get-property('PseudoCityCode'), ':', get-property('client_domain'))" scope="default"/>
+            
+            <!-- Base64 Encode -->
+            <property name="username_base64" expression="base64Encode(get-property('JSON_Username'))" scope="default"/>
+            <property name="password_base64" expression="base64Encode(get-property('password'))" scope="default"/>
+            
+            <!-- Generate Token -->
+            <property name="Key_Generate" expression="fn:concat(get-property('username_base64'), ':', get-property('password_base64'))" scope="default"/>
+            <property name="Token" expression="base64Encode(get-property('Key_Generate'))" scope="default"/>
+
+            <!-- Set Headers -->
+            <header name="Content-Type" scope="transport" value="application/x-www-form-urlencoded"/>
+            <header name="Authorization" expression="fn:concat('Basic ', get-property('Token'))" scope="transport"/>
+
+            <!-- Call the Token API -->
+
+           <property name="messageType" scope="axis2" type="STRING" value="application/x-www-form-urlencoded"/>
+           <property name="DISABLE_CHUNKING" scope="axis2" type="STRING" value="true"/>
+            <send>
+                <endpoint>
+                    <http method="POST" uri-template="https://api.cert.platform.sabre.com/v2/auth/token?grant_type=client_credentials"/>
+                </endpoint>
+            </send>
+        </inSequence>
+        
+        <outSequence>
+            <respond />
+        </outSequence>
+    </target>
+</proxy>
