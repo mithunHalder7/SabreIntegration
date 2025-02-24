@@ -179,46 +179,62 @@
        return uuid;
    }
 
-   var scheduleDescs = JSON.parse(mc.getProperty('scheduleDescsMain')) || [];
+       var scheduleDescs = JSON.parse(mc.getProperty('scheduleDescsMain')) || [];
+       var scheduleData = {}; // Change from array to object
 
-    // Initialize scheduleData as an array
-    var scheduleData = [];
+      // Populate scheduleData as an object with id as key
+      for (var i = 0; i < scheduleDescs.length; i++) {
+         var schedule = scheduleDescs[i];
+         scheduleData[schedule.id] = schedule; // Store with ID as key
+        }
 
-    for (var i = 0; i < scheduleDescs.length; i++) {
-        var schedule = scheduleDescs[i];
-        // Push each schedule object into the array
-        scheduleData.push({
-            id: schedule.id,
-            data: schedule  // Store the entire schedule object or specific properties as needed
-        });
-    }
-   
-       mc.setProperty("LOG_SCHEDULE_DATA", JSON.stringify(scheduleData[0]));
+          // Log the result for debugging
+        mc.setProperty("LOG_SCHEDULE_DATA", JSON.stringify(scheduleData["1"]));
 
- 
-// Prepare leg descriptions
-    var legsData_temp = JSON.parse(mc.getProperty('legsMain')) || [];
-    var legsData = [];
-    // Convert legsData_temp into legsData
-    for (var j = 0; j < legsData_temp.length; j++) {
-        var row = legsData_temp[j];
-        legsData.push({
-            id: row.id,
-            data: row
-        });
-
+       // Prepare leg descriptions
     
-        
+
+ var legsData_temp = JSON.parse(mc.getProperty('legsMain')) || [];
+var legsData = {};
+
+// Convert legsData_temp into legsData
+for (var j = 0; j < legsData_temp.length; j++) {
+    var row = legsData_temp[j];
+    legsData[row.id] = row;
+
+    // Ensure schedules exist in each leg to avoid undefined errors
+    if (!row.schedules || !Array.isArray(row.schedules)) {
+        legsData[row.id].schedules = {}; // Initialize if missing
+        continue; // Skip processing this leg if schedules are missing
     }
 
-    mc.setProperty("LOG_LEG_DATA", JSON.stringify(legsData[0]));
+    // Link each schedule to the appropriate leg
+    for (var k = 0; k < row.schedules.length; k++) {
+        var scheduleObj = row.schedules[k];
 
+        // Check if scheduleObj exists and has a "ref" property
+        if (!scheduleObj || !scheduleObj.hasOwnProperty("ref")) {
+            continue; // Skip if ref is missing
+        }
 
-  
+        var ref = scheduleObj.ref;
 
- ]]>
+        if (scheduleData.hasOwnProperty(ref)) {
+            // Ensure .schedules object is defined before assignment
+            if (!legsData[row.id].schedules) {
+                legsData[row.id].schedules = {};
+            }
+            legsData[row.id].schedules[ref] = scheduleData[ref];
+        }
+    }
+}
+
+// Logging for debugging
+mc.setProperty("LOG_LEG_DATA", JSON.stringify(legsData));
+
+]]>
                
-               </script>
+</script>
             <!-- 4) Log Mediator to see the data -->
             <log level="custom">
                 
