@@ -1,13 +1,14 @@
-<proxy xmlns="http://ws.apache.org/ns/synapse" name="SabreFlightSearchProxy" startOnLoad="true" trace="disable" transports="http https">
+<?xml version="1.0" encoding="UTF-8"?>
+<proxy name="SabreFlightSearchProxy" startOnLoad="true" transports="http https" xmlns="http://ws.apache.org/ns/synapse">
     <target>
         <inSequence>
             <!-- Extract properties from the enriched payload -->
-            <property name="access_token" expression="json-eval($.token)" scope="default"/>
-            <property name="originalPayload" expression="json-eval($.originalPayload)" scope="default"/>
-            <property name="departureDate" expression="json-eval($.originalPayload.departureDate)" scope="default"/>
-            <property name="formattedDepartureDate" expression="fn:concat(get-property('departureDate'), 'T00:00:00')" scope="default"/>
+            <property expression="json-eval($.token)" name="access_token" scope="default" type="STRING"/>
+            <property expression="json-eval($.originalPayload)" name="originalPayload" scope="default" type="STRING"/>
+            <property expression="json-eval($.originalPayload.departureDate)" name="departureDate" scope="default" type="STRING"/>
+            <property expression="fn:concat(get-property('departureDate'), 'T00:00:00')" name="formattedDepartureDate" scope="default" type="STRING"/>
             <!-- Construct the new payload merging originalPayload and new data -->
-            <payloadFactory media-type="json" template-type="default">
+            <payloadFactory media-type="json">
                 <format>{
                     "OTA_AirLowFareSearchRQ": {
                     "Version": "5",
@@ -109,138 +110,33 @@
                     }
                 </format>
                 <args>
-                    <arg expression="get-property('formattedDepartureDate')" evaluator="xml"/>
-                    <arg expression="json-eval($.originalPayload.originLocation)" evaluator="json"/>
-                    <arg expression="json-eval($.originalPayload.destinationLocation)" evaluator="json"/>
+                    <arg evaluator="xml" expression="get-property('formattedDepartureDate')"/>
+                    <arg evaluator="json" expression="$.originalPayload.originLocation"/>
+                    <arg evaluator="json" expression="$.originalPayload.destinationLocation"/>
                 </args>
             </payloadFactory>
             <!-- Set Headers for the API Call -->
             <header name="Content-Type" scope="transport" value="application/json"/>
-            <header name="Authorization" expression="fn:concat('Bearer ', get-property('access_token'))" scope="transport"/>
+            <header expression="fn:concat('Bearer ', get-property('access_token'))" name="Authorization" scope="transport"/>
             <header name="X-Sabre-Enable-Experimental-Cache-Bypass" scope="transport" value="true"/>
             <header name="cache-control" scope="transport" value="no-cache"/>
             <!-- Call the Sabre API -->
             <call>
                 <endpoint>
-                    <http method="POST" uri-template="https://api.cert.platform.sabre.com/v5/offers/shop"/>
+                    <http method="post" uri-template="https://api.cert.platform.sabre.com/v5/offers/shop">
+                        <suspendOnFailure>
+                            <initialDuration>-1</initialDuration>
+                            <progressionFactor>1</progressionFactor>
+                        </suspendOnFailure>
+                        <markForSuspension>
+                            <retriesBeforeSuspension>0</retriesBeforeSuspension>
+                        </markForSuspension>
+                    </http>
                 </endpoint>
             </call>
-            <!-- <property name="ScheduleDescs" expression="json-eval($.groupedItineraryResponse.scheduleDescs)" scope="default"/>
-         
-            <property name="scheduleData" value="[" scope="default"/>
-            
-            <foreach expression="json-eval($.groupedItineraryResponse.scheduleDescs)">
-                <sequence>
-                 
-                    <property name="ScheduleID" expression="json-eval($.id)" scope="default"/>
-                    <property name="ScheduleItem" expression="json-eval($.)" scope="default"/>
-                    
-                    <payloadFactory media-type="json">
-                        <format>
-                            {
-                            "id": "$1",
-                            "data": $2
-                            }
-                        </format>
-                        <args>
-                            <arg expression="get-property('ScheduleID')"/>
-                            <arg expression="get-property('ScheduleItem')"/>
-                        </args>
-                    </payloadFactory>
-                    
-                    <property name="scheduleEntry" expression="json-eval($.)" scope="default"/>
-                    
-                    <filter source="string-length(get-property('scheduleData'))" regex="^1$">
-                        <then>
-                            <property name="scheduleData" expression="fn:concat(get-property('scheduleData'), get-property('scheduleEntry'))" scope="default"/>
-                        </then>
-                        <else>
-                            <property name="scheduleData" expression="fn:concat(get-property('scheduleData'), ',', get-property('scheduleEntry'))" scope="default"/>
-                        </else>
-                    </filter>
-                </sequence>
-            </foreach> -->
-            <!-- Close the JSON array -->
-            <!-- <property name="scheduleData" expression="fn:concat(get-property('scheduleData'), ']')" scope="default"/> -->
-            <!-- Log the final processed scheduleData -->
-            <!-- Initialize tracking ID and counters -->
-            <property name="groupedItineraryResponse" expression="json-eval($.)" scope="default"/>
-            <property name="scheduleDescsMain" expression="json-eval($.groupedItineraryResponse.scheduleDescs)" scope="default"/>
-            <property name="legsMain" expression="json-eval($.groupedItineraryResponse.legDescs)" scope="default"/>
-            <script language="js"><![CDATA[
-                
-                function generateUUID() {
-       var dt = new Date().getTime();
-       var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-           var r = (dt + Math.random() * 16) % 16 | 0;
-           dt = Math.floor(dt / 16);
-           return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-       });
-       return uuid;
-   }
-
-       var scheduleDescs = JSON.parse(mc.getProperty('scheduleDescsMain')) || [];
-       var scheduleData = {}; // Change from array to object
-
-      // Populate scheduleData as an object with id as key
-      for (var i = 0; i < scheduleDescs.length; i++) {
-         var schedule = scheduleDescs[i];
-         scheduleData[schedule.id] = schedule; // Store with ID as key
-        }
-
-          // Log the result for debugging
-        mc.setProperty("LOG_SCHEDULE_DATA", JSON.stringify(scheduleData["1"]));
-
-       // Prepare leg descriptions
-    
-
- var legsData_temp = JSON.parse(mc.getProperty('legsMain')) || [];
-var legsData = {};
-
-// Convert legsData_temp into legsData
-for (var j = 0; j < legsData_temp.length; j++) {
-    var row = legsData_temp[j];
-    legsData[row.id] = row;
-
-    // Ensure schedules exist in each leg to avoid undefined errors
-    if (!row.schedules || !Array.isArray(row.schedules)) {
-        legsData[row.id].schedules = {}; // Initialize if missing
-        continue; // Skip processing this leg if schedules are missing
-    }
-
-    // Link each schedule to the appropriate leg
-    for (var k = 0; k < row.schedules.length; k++) {
-        var scheduleObj = row.schedules[k];
-
-        // Check if scheduleObj exists and has a "ref" property
-        if (!scheduleObj || !scheduleObj.hasOwnProperty("ref")) {
-            continue; // Skip if ref is missing
-        }
-
-        var ref = scheduleObj.ref;
-
-        if (scheduleData.hasOwnProperty(ref)) {
-            // Ensure .schedules object is defined before assignment
-            if (!legsData[row.id].schedules) {
-                legsData[row.id].schedules = {};
-            }
-            legsData[row.id].schedules[ref] = scheduleData[ref];
-        }
-    }
-}
-
-// Logging for debugging
-mc.setProperty("LOG_LEG_DATA", JSON.stringify(legsData));
-
-]]>
-               
-</script>
-            <!-- 4) Log Mediator to see the data -->
-            <log level="custom">
-                
-                <property name="LOG_SCHEDULE" expression="get-property('LOG_SCHEDULE_DATA')"/>
-                <property name="LOG_LEG" expression="get-property('LOG_LEG_DATA')"/>
-            </log>
+            <respond/>
         </inSequence>
+        <outSequence/>
+        <faultSequence/>
     </target>
 </proxy>

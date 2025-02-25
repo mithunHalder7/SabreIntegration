@@ -16,5 +16,7 @@
         "**/.settings": true,
         "**/.exchange_modules_tmp": true,
         ".mule": true
-    }
+    },
+    "MI.SERVER_PATH": "c:\\WSO2\\wso2mi-4.3.0\\wso2mi-4.3.0",
+    "MI.JAVA_HOME": "C:\\Program Files\\Java\\jdk-17"
 }
